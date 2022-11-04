@@ -1,0 +1,409 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using LibraryManagerTests.Models;
+using Microsoft.DotNet.ProjectModel.Resolution;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using NUnit.Framework;
+
+namespace LibraryManagerTests
+{
+    public class LibraryManagerClient
+    {
+        private HttpClient _client;
+        private static IConfiguration Configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
+        private static string Uri => Configuration.GetConnectionString("LibraryManager.Url");
+
+        public LibraryManagerClient()
+        {
+            _client = new HttpClient
+            {
+                BaseAddress = new Uri(Uri)
+            };
+        }
+        public Response<Book> AddBook(Book book)
+        {
+            var response = _client.PostAsync("/api/books", GetRequest(book)).GetAwaiter().GetResult();
+            return GetResponse<Book>(response);
+        }
+
+        public Response<Book> UpdateBook(Book book, int id)
+        {
+            var response = _client.PutAsync($"/api/books/{id}", GetRequest(book)).GetAwaiter().GetResult();
+            return GetResponse<Book>(response);
+        }
+
+        public Response<Book> DeleteBook(int id)
+        {
+            var response = _client.DeleteAsync($"/api/books/{id}").GetAwaiter().GetResult();
+            return GetResponse<Book>(response);
+        }
+
+        public Response<Book> GetBook(int id)
+        {
+            var response = _client.GetAsync($"/api/books/{id}").GetAwaiter().GetResult();
+            return GetResponse<Book>(response);
+        }
+
+        public Response<List<Book>> GetBooks(string title = null)
+        {
+            var response = _client.GetAsync($"/api/books?title={title}").GetAwaiter().GetResult();
+            return GetResponse<List<Book>>(response);
+        }
+
+        private StringContent GetRequest<T>(T body)
+        {
+            return new StringContent(JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+        }
+
+        private Response<T> GetResponse<T>(HttpResponseMessage httpResponseMessage)
+        {
+            var response = new Response<T>
+            {
+                StatusCode = httpResponseMessage.StatusCode
+            };
+
+            var httpPayload = httpResponseMessage.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+            if (httpResponseMessage.IsSuccessStatusCode)
+            {
+                response.Payload = JsonConvert.DeserializeObject<T>(httpPayload);
+            }
+            else
+            {
+                response.Error = JsonConvert.DeserializeObject<Error>(httpPayload);
+            }
+
+            return response;
+        }
+
+        //1
+        [Test]
+        public void AddBook()
+        {
+            var newBook = new Book
+            {
+                Id = 129,
+                Title = "Best1",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.OK, request.StatusCode);
+        }
+        //2
+        [Test]
+        public void GetAdded()
+        {
+            var request = GetBook(129);
+            var response = new Response<Book>();
+            Assert.AreEqual(HttpStatusCode.OK, request.StatusCode);
+        }
+        //3 
+        [Test]
+        public void GetAddedTitle()
+        {
+            var newBook = new Book
+            {
+                Id = 129,
+                Title = "Best1",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = GetBook(129);
+            Assert.AreEqual(newBook.Title, request.Payload.Title);
+
+        }
+        //4
+        [Test]
+        public void GetAddedDescription()
+        {
+            var newBook = new Book
+            {
+                Id = 129,
+                Title = "Best1",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = GetBook(129);
+            Assert.AreEqual(newBook.Description, request.Payload.Description);
+
+        }
+        //5
+        [Test]
+        public void GetAddedAutor()
+        {
+            var newBook = new Book
+            {
+                Id = 129,
+                Title = "Best1",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = GetBook(129);
+            Assert.AreEqual(newBook.Description, request.Payload.Author);
+
+        }
+        //6
+        [Test]
+        public void AddBookAlreadyExist()
+        {
+            var newBook = new Book
+            {
+                Id = 129,
+                Title = "Best1",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.BadRequest, request.StatusCode);
+        }
+        //7
+        [Test]
+        public void AddBookWithoutTitle()
+        {
+            var newBook = new Book
+            {
+                Id = 130,
+                Title = "",
+                Description = "Best2",
+                Author = "AzAz"
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.BadRequest, request.StatusCode);
+        }
+        //8
+        [Test]
+        public void AddBookWithoutDescription()
+        {
+            var newBook = new Book
+            {
+                Id = 131,
+                Title = "BBB",
+                Description = "",
+                Author = "AzAz"
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.OK, request.StatusCode);
+        }
+        //9
+        [Test]
+        public void AddBookWithoutAuthor()
+        {
+            var newBook = new Book
+            {
+                Id = 132,
+                Title = "CCC",
+                Description = "Best2",
+                Author = ""
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.BadRequest, request.StatusCode);
+        }
+        //10
+        [Test]
+        public void AddBookTitleMoreThan100()
+        {
+            var newBook = new Book
+            {
+                Id = 133,
+                Title = "SummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummer",
+                Description = "Best2",
+                Author = ""
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.BadRequest, request.StatusCode);
+        }
+        //11
+        [Test]
+        public void AddBookAuthorMoreThan30()
+        {
+            var newBook = new Book
+            {
+                Id = 132,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "SummerSummerSummerSummerSummer"
+            };
+            var request = AddBook(newBook);
+            Assert.AreEqual(HttpStatusCode.BadRequest, request.StatusCode);
+        }
+        //12
+        [Test]
+        public void GetNotExistingID()
+        {
+            var requestGet = GetBook(9857);
+            Assert.AreEqual(HttpStatusCode.NotFound, requestGet.StatusCode);
+        }
+        //13
+        [Test]
+        public void UpdateBookNewID()
+        {
+            var newBook = new Book
+            {
+                Id = 155,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "SummerSummerSummerSummerSummer"
+            };
+            var request = AddBook(newBook);
+            var updatedBook = new Book
+            {
+                Id = 158,
+                Title = "hope",
+                Description = "Best12",
+                Author = "Summer"
+            };
+            var requestUpdate = UpdateBook(updatedBook, 155);
+            Assert.AreEqual(HttpStatusCode.BadRequest, requestUpdate.StatusCode);
+        }
+        //14
+        [Test]
+        public void UpdateBookNewData()
+        {
+            var newBook = new Book
+            {
+                Id = 168,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "SummerSummerSummerSummerSummer"
+            };
+            var request = AddBook(newBook);
+            var updatedBook = new Book
+            {
+                Id = 168,
+                Title = "hope",
+                Description = "last",
+                Author = "Summer"
+            };
+            var requestUpdate = UpdateBook(updatedBook, 168);
+            Assert.AreEqual(HttpStatusCode.OK, requestUpdate.StatusCode);
+        }
+        //15
+        [Test]
+        public void UpdateBookNewDataNotAcceptedAuthor()
+        {
+            var newBook = new Book
+            {
+                Id = 170,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "Summer"
+            };
+            var request = AddBook(newBook);
+            var updatedBook = new Book
+            {
+                Id = 170,
+                Title = "hope",
+                Description = "last",
+                Author = "SummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummerSummer"
+            };
+            var requestUpdate = UpdateBook(updatedBook, 170);
+            Assert.AreEqual(HttpStatusCode.BadRequest, requestUpdate.StatusCode);
+        }
+        //16
+        [Test]
+        public void UpdateBookNewDataNotAcceptedTitle()
+        {
+            var newBook = new Book
+            {
+                Id = 172,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "Summer"
+            };
+            var request = AddBook(newBook);
+            var updatedBook = new Book
+            {
+                Id = 172,
+                Title = "hopeloveseahopeloveseahopeloveseahopeloveseahopeloveseahopeloveseahopeloveseahopeloveseahopeloveseahopelovesea",
+                Description = "last",
+                Author = "SummerSummer"
+            };
+            var requestUpdate = UpdateBook(updatedBook, 172);
+            Assert.AreEqual(HttpStatusCode.BadRequest, requestUpdate.StatusCode);
+        }
+        //17
+        [Test]
+        public void UpdateBookEmptyDescription()
+        {
+            var newBook = new Book
+            {
+                Id = 173,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "Summer"
+            };
+            var request = AddBook(newBook);
+            var updatedBook = new Book
+            {
+                Id = 173,
+                Title = "",
+                Description = "",
+                Author = ""
+            };
+            var requestUpdate = UpdateBook(updatedBook, 173);
+            Assert.AreEqual(HttpStatusCode.BadRequest, requestUpdate.StatusCode);
+        }
+        //18
+        [Test]
+        public void UpdateBookDoesntExist()
+        {
+
+            var updatedBook = new Book
+            {
+                Id = 173,
+                Title = "jkjk",
+                Description = "kjkj",
+                Author = "lkkj"
+            };
+            var requestUpdate = UpdateBook(updatedBook, 898984);
+            Assert.AreEqual(HttpStatusCode.NotFound, requestUpdate.StatusCode);
+        }
+        //19
+        [Test]
+        public void DeleteBook()
+        {
+            var newBook = new Book
+            {
+                Id = 233,
+                Title = "CCC",
+                Description = "Best2",
+                Author = "Summer"
+            };
+            var request = AddBook(newBook);
+            var requestDelete = DeleteBook(173);
+            Assert.AreEqual(HttpStatusCode.NoContent, requestDelete.StatusCode);
+        }
+        //20
+        [Test]
+        public void DeleteBookDoesntExist()
+        {
+            var request = DeleteBook(77747);
+            Assert.AreEqual(HttpStatusCode.NotFound, request.StatusCode);
+        }
+        //21
+        [Test]
+        public void GetAllBooks()
+        {
+            var request = GetBooks();
+            Assert.AreEqual(HttpStatusCode.OK, request.StatusCode);
+        }
+        //22
+        [Test]
+        public void ErrorMsg()
+        {
+            var request = GetBook(15486);
+            var errorMsg = request.Error.Message.ToString();
+     
+            Assert.AreEqual("Book with id 15486 not found!", $"{errorMsg}");
+        
+        }
+
+
+
+    }
+}
